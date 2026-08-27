@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /search
+Disallow: /cdn-cgi/rum
+Sitemap: https://cdn.wasalt.sa/sitemap/product_sitemap_en_sa.xml.gz

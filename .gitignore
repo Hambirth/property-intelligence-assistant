@@ -1,0 +1,54 @@
+# Secrets and local overrides
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+*.tsbuildinfo
+*.log
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Coverage and build output
+.coverage
+coverage/
+htmlcov/
+dist/
+build/
+.model-cache/
+.cache/
+*.db
+*.sqlite
+*.sqlite3
+*.tmp
+tmp/
+artifacts/
+*.corpus.tar.gz
+
+# Operator-supplied/public corpus payloads and generated local representations
+data/import/**/*.pdf
+data/import/**/*.html
+data/import/**/*.htm
+data/import/**/*.txt
+data/import/**/*.json
+data/import/**/*_files/
+data/processed/
+**/data/processed/

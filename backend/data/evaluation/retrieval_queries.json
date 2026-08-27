@@ -1,0 +1,122 @@
+[
+  {
+    "case_id": "astera-brand",
+    "category": "darglobal-project",
+    "query": "Which DarGlobal residence has interiors by Aston Martin?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/DG_AM_The_Astera_Brochure_EN_1_dce26e7ab3.pdf"],
+    "source": "darglobal"
+  },
+  {
+    "case_id": "marriott-aida",
+    "category": "darglobal-project",
+    "query": "Which Marriott branded residences are located at AIDA in Oman?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/DG_Aida_Marriott_brochure_2_compressed_4497cdebe8.pdf"]
+  },
+  {
+    "case_id": "altara-location",
+    "category": "location",
+    "query": "Which project is in Wadi Safar near Diriyah?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/DG_Altara_Brochure_EN_e957a8caa7.pdf"]
+  },
+  {
+    "case_id": "marea-location",
+    "category": "location",
+    "query": "What Missoni project is near Finca Cortesin on the Costa del Sol?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/DG_MAREA_Brochure_16e8e199f3.pdf"]
+  },
+  {
+    "case_id": "urban-oasis-location",
+    "category": "location",
+    "query": "Which Missoni residential tower stands on Dubai Canal?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/D_Gx_Missoni_Urban_Oasis_Brochure_EN_1f989fdd33.pdf"]
+  },
+  {
+    "case_id": "neptune-brand",
+    "category": "darglobal-project",
+    "query": "Which Riyadh project is designed with Mouawad?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/D_Gx_Mouawad_Neptune_Brochure_EN_d2730ddcf4.pdf"]
+  },
+  {
+    "case_id": "les-vagues-brand",
+    "category": "darglobal-project",
+    "query": "Which Elie Saab residences are on Qetaifan Island North?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/Les_Vagues_Brochure_8dba79dcdc.pdf"]
+  },
+  {
+    "case_id": "great-escape-buildings",
+    "category": "darglobal-project",
+    "query": "Which AIDA project has two buildings of seven and nine stories?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/The_Great_Escape_1_ENG_5f8a045ef2.pdf"]
+  },
+  {
+    "case_id": "tierra-viva-brand",
+    "category": "darglobal-project",
+    "query": "Which Lamborghini-inspired villas are in Benahavis?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/Tierra_Viva_Brochure_Digital_EN_adf1e03fad.pdf"]
+  },
+  {
+    "case_id": "w-residences-landmarks",
+    "category": "location",
+    "query": "Which W-branded residences are close to Burj Khalifa and Dubai Mall?",
+    "expected_urls": ["https://cdn.darglobal.co.uk/W_Residences_Dubai_Downtown_Brochure_7b7a9f3695.pdf"]
+  },
+  {
+    "case_id": "wasalt-5786979-price",
+    "category": "price",
+    "query": "What is the price of the 103 SQM three-bedroom apartment in Al Naeem?",
+    "expected_urls": ["https://wasalt.sa/en/property/sale/apartment-103-sqm-with-3-bedrooms-5786979"],
+    "source": "wasalt"
+  },
+  {
+    "case_id": "wasalt-5786970-bedrooms",
+    "category": "bedrooms",
+    "query": "How many bedrooms are in the 480000 SAR apartment in Al Seef, Dammam?",
+    "expected_urls": ["https://wasalt.sa/en/property/sale/apartment-with-3-bedrooms-5786970"]
+  },
+  {
+    "case_id": "wasalt-5787065-price",
+    "category": "price",
+    "query": "Which Al Nahdah apartment costs 1.7 million SAR?",
+    "expected_urls": ["https://wasalt.sa/en/property/sale/apartment-with-3-bedrooms-5787065"]
+  },
+  {
+    "case_id": "wasalt-5786882-bedrooms",
+    "category": "bedrooms",
+    "query": "Find the four-bedroom apartment in Al Wahah priced at 470000 SAR.",
+    "expected_urls": ["https://wasalt.sa/en/property/sale/apartment-with-4-bedrooms-5786882"]
+  },
+  {
+    "case_id": "wasalt-5786878-land",
+    "category": "property-detail",
+    "query": "Which 312 SQM land faces east on a 16 metre street?",
+    "expected_urls": ["https://wasalt.sa/en/property/sale/land-3125-sqm-facing-east-on-16m-width-street-5786878"]
+  },
+  {
+    "case_id": "wasalt-5786944-villa",
+    "category": "property-detail",
+    "query": "Which 238 SQM south-facing villa costs 900000 SAR?",
+    "expected_urls": ["https://wasalt.sa/en/property/sale/villa-23873-sqm-facing-south-on-12m-width-street-5786944"]
+  },
+  {
+    "case_id": "cross-source-riyadh-villa",
+    "category": "cross-source",
+    "query": "Compare a Riyadh DarGlobal residence designed by Mouawad with the 291 SQM Wasalt villa.",
+    "expected_urls": [
+      "https://cdn.darglobal.co.uk/D_Gx_Mouawad_Neptune_Brochure_EN_d2730ddcf4.pdf",
+      "https://wasalt.sa/en/property/sale/villa-29162-sqm-facing-north-on-12m-width-street-5786931"
+    ]
+  },
+  {
+    "case_id": "trap-london-helipad",
+    "category": "hallucination-trap",
+    "query": "Which property has a private helipad in London and costs 50 million pounds?",
+    "expected_urls": []
+  },
+  {
+    "case_id": "trap-wasalt-helipad",
+    "category": "missing-information",
+    "query": "Which Wasalt apartment explicitly includes a private helipad?",
+    "expected_urls": [],
+    "source": "wasalt"
+  }
+]
