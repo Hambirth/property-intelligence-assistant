@@ -167,12 +167,25 @@ async def test_invalid_grounded_output_retries_once_and_recovers() -> None:
     assert "Do not include URLs" in retry_prompt
 
 
-async def test_provider_failure_is_safe_and_does_not_return_context() -> None:
+async def test_provider_rate_limit_returns_bounded_grounded_evidence() -> None:
     generator = FakeGenerator(error=LLMErrorCategory.RATE_LIMITED)
     response = await _service([_result()], generator).answer("What is the price?")
 
-    assert response.status is RAGStatus.UNAVAILABLE
+    assert response.status is RAGStatus.ANSWERED
     assert response.error_category is LLMErrorCategory.RATE_LIMITED
+    assert "temporarily limited" in response.answer
+    assert "500000 SAR" in response.answer
+    assert len(response.answer) < 700
+    assert response.model == "deterministic/source-evidence-fallback"
+    assert response.citations[0].url == "https://wasalt.sa/en/property/apartment-1"
+
+
+async def test_invalid_provider_response_does_not_use_evidence_fallback() -> None:
+    generator = FakeGenerator(error=LLMErrorCategory.INVALID_RESPONSE)
+    response = await _service([_result()], generator).answer("What is the price?")
+
+    assert response.status is RAGStatus.UNAVAILABLE
+    assert response.error_category is LLMErrorCategory.INVALID_RESPONSE
     assert "500000" not in response.answer
     assert response.citations == []
 
@@ -232,9 +245,7 @@ async def test_branded_interiors_question_uses_corpus_titles_without_provider() 
 
 async def test_explicit_cross_source_question_retrieves_each_source() -> None:
     retrieval = SourceAwareRetrieval()
-    generator = FakeGenerator(
-        '{"answer":"A supported comparison.","citations":["S1","S2"]}'
-    )
+    generator = FakeGenerator('{"answer":"A supported comparison.","citations":["S1","S2"]}')
     service = GroundedRAGService(
         retrieval=retrieval,
         generator=generator,

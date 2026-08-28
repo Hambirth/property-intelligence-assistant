@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from collections.abc import Sequence
 from enum import StrEnum
@@ -91,9 +92,7 @@ class GroundedRAGService:
         self._top_k = top_k
         self._max_question_length = max_question_length
 
-    async def answer(
-        self, question: str, *, source: SourceName | None = None
-    ) -> RAGResponse:
+    async def answer(self, question: str, *, source: SourceName | None = None) -> RAGResponse:
         total_started = time.perf_counter()
         clean_question = question.strip()
         if not clean_question or len(clean_question) > self._max_question_length:
@@ -165,6 +164,30 @@ class GroundedRAGService:
             llm_ms = _elapsed_ms(llm_started)
         except OpenRouterError as exc:
             llm_ms = _elapsed_ms(llm_started)
+            if exc.category in {
+                LLMErrorCategory.RATE_LIMITED,
+                LLMErrorCategory.TIMEOUT,
+                LLMErrorCategory.UNAVAILABLE,
+            }:
+                fallback = _provider_evidence_fallback(clean_question, context.sources)
+                if fallback is not None:
+                    answer, fallback_sources = fallback
+                    logger.warning(
+                        "Using grounded evidence fallback after provider failure",
+                        extra={"provider_error_category": exc.category.value},
+                    )
+                    response = RAGResponse(
+                        status=RAGStatus.ANSWERED,
+                        answer=answer,
+                        citations=[_citation(item) for item in fallback_sources],
+                        error_category=exc.category,
+                        model="deterministic/source-evidence-fallback",
+                        retrieved_chunk_count=len(results),
+                        top_similarity=top_similarity,
+                        timings=_timings(total_started, retrieval_ms, context_ms, llm_ms),
+                    )
+                    self._log(response)
+                    return response
             return self._unavailable(
                 total_started,
                 exc.category,
@@ -210,9 +233,7 @@ class GroundedRAGService:
         self._log(response)
         return response
 
-    async def _retrieve(
-        self, question: str, source: SourceName | None
-    ) -> list[RetrievalResult]:
+    async def _retrieve(self, question: str, source: SourceName | None) -> list[RetrievalResult]:
         lowered = question.casefold()
         if _is_branded_interiors_question(question):
             per_project = max(1, self._top_k // 2)
@@ -230,9 +251,7 @@ class GroundedRAGService:
             for result in [*astera, *marea]:
                 unique.setdefault(result.canonical_url, result)
             return list(unique.values())[: self._top_k]
-        explicitly_cross_source = (
-            source is None and "darglobal" in lowered and "wasalt" in lowered
-        )
+        explicitly_cross_source = source is None and "darglobal" in lowered and "wasalt" in lowered
         if not explicitly_cross_source:
             return await self._retrieval.search(question, top_k=self._top_k, source=source)
 
@@ -240,12 +259,10 @@ class GroundedRAGService:
         darglobal = await self._retrieval.search(
             question, top_k=per_source, source=SourceName.DAR_GLOBAL
         )
-        wasalt = await self._retrieval.search(
-            question, top_k=per_source, source=SourceName.WASALT
-        )
-        return sorted(
-            [*darglobal, *wasalt], key=lambda result: result.similarity, reverse=True
-        )[: self._top_k]
+        wasalt = await self._retrieval.search(question, top_k=per_source, source=SourceName.WASALT)
+        return sorted([*darglobal, *wasalt], key=lambda result: result.similarity, reverse=True)[
+            : self._top_k
+        ]
 
     def _refusal(
         self,
@@ -349,6 +366,122 @@ def _is_branded_interiors_question(question: str) -> bool:
     lowered = question.casefold()
     required_terms = ("darglobal", "residenc", "interior", "luxury", "brand")
     return all(term in lowered for term in required_terms)
+
+
+_FALLBACK_STOP_WORDS = {
+    "a",
+    "about",
+    "and",
+    "are",
+    "at",
+    "can",
+    "do",
+    "for",
+    "from",
+    "has",
+    "have",
+    "how",
+    "in",
+    "is",
+    "it",
+    "me",
+    "of",
+    "on",
+    "or",
+    "property",
+    "tell",
+    "that",
+    "the",
+    "this",
+    "to",
+    "what",
+    "which",
+    "with",
+}
+
+
+def _provider_evidence_fallback(
+    question: str, sources: Sequence[ContextSource]
+) -> tuple[str, list[ContextSource]] | None:
+    """Return bounded corpus excerpts when generation is temporarily unavailable."""
+    question_terms = _meaningful_terms(question)
+    selected: list[tuple[ContextSource, str]] = []
+    seen_urls: set[str] = set()
+    for source in sources:
+        if source.canonical_url in seen_urls:
+            continue
+        excerpt = _best_evidence_excerpt(source.text, question_terms)
+        facts = _metadata_facts(source.metadata)
+        detail = excerpt
+        if facts:
+            detail = f"{detail} ({'; '.join(facts)})" if detail else "; ".join(facts)
+        if not detail:
+            continue
+        selected.append((source, detail))
+        seen_urls.add(source.canonical_url)
+        if len(selected) >= 3:
+            break
+    if not selected:
+        return None
+
+    lines = [
+        "The AI answer service is temporarily limited, so here is the most relevant "
+        "verified source evidence:",
+        "",
+    ]
+    lines.extend(f"- **{source.title}:** {detail}" for source, detail in selected)
+    return "\n".join(lines), [source for source, _ in selected]
+
+
+def _best_evidence_excerpt(text: str, question_terms: set[str]) -> str:
+    candidates: list[tuple[int, int, str]] = []
+    for raw in re.split(r"(?<=[.!?])\s+|[\r\n]+", text):
+        sentence = " ".join(raw.split()).strip(" -•\t")
+        if len(sentence) < 24:
+            continue
+        overlap = len(_meaningful_terms(sentence) & question_terms)
+        candidates.append((overlap, min(len(sentence), 280), sentence))
+    if not candidates:
+        return ""
+    _, _, best = max(candidates, key=lambda item: (item[0], item[1]))
+    if len(best) <= 280:
+        return best
+    shortened = best[:277].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return f"{shortened}…"
+
+
+def _meaningful_terms(text: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", text.casefold())
+        if len(token) > 1 and token not in _FALLBACK_STOP_WORDS
+    }
+
+
+def _metadata_facts(metadata: dict[str, object]) -> list[str]:
+    labels = (
+        ("price", "Price"),
+        ("location", "Location"),
+        ("city", "City"),
+        ("property_type", "Property type"),
+        ("bedrooms", "Bedrooms"),
+        ("bathrooms", "Bathrooms"),
+        ("brand_partnership", "Brand partnership"),
+    )
+    facts: list[str] = []
+    for key, label in labels:
+        value = metadata.get(key)
+        if value in (None, "", []):
+            continue
+        rendered = ", ".join(str(item) for item in value) if isinstance(value, list) else str(value)
+        if key == "price":
+            currency = metadata.get("currency")
+            if currency and str(currency).casefold() not in rendered.casefold():
+                rendered = f"{rendered} {currency}"
+        facts.append(f"{label}: {rendered}")
+        if len(facts) >= 4:
+            break
+    return facts
 
 
 def _elapsed_ms(started: float) -> float:
