@@ -24,3 +24,16 @@ def test_lexical_fallback_keeps_unsupported_query_below_evidence_threshold() -> 
     )
 
     assert score < 0.55
+
+
+def test_lexical_fallback_recognizes_w_residences_question() -> None:
+    terms = _lexical_terms("What information is available about W Residences Dubai?")
+
+    matched, score = _lexical_score(
+        terms,
+        "W Residences Dubai Downtown is located near Burj Khalifa and Dubai Mall.",
+    )
+
+    assert terms == frozenset({"w", "dubai"})
+    assert matched == 2
+    assert score == 0.99

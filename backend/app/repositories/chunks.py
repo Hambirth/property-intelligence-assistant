@@ -17,11 +17,13 @@ _LEXICAL_TOKEN_RE = re.compile(r"[^\W_]+", flags=re.UNICODE)
 _LEXICAL_STOP_WORDS = frozenset(
     {
         "a",
+        "about",
         "all",
         "an",
         "and",
         "are",
         "at",
+        "available",
         "by",
         "compare",
         "darglobal",
@@ -32,6 +34,7 @@ _LEXICAL_STOP_WORDS = frozenset(
         "have",
         "how",
         "in",
+        "information",
         "is",
         "it",
         "near",
@@ -192,12 +195,15 @@ def _lexical_terms(text: str) -> frozenset[str]:
     )
 
 
-def _normalize_lexical_token(token: str) -> str:
-    if len(token) < 2:
+def _normalize_lexical_token(term: str) -> str:
+    # "W" is a distinctive property/hospitality brand in the verified corpus.
+    if term == "w":
+        return term
+    if len(term) < 2:
         return ""
-    if token.isascii() and len(token) > 4 and token.endswith("s"):
-        return token[:-1]
-    return token
+    if term.isascii() and len(term) > 4 and term.endswith("s"):
+        return term[:-1]
+    return term
 
 
 def _lexical_score(query_terms: frozenset[str], text: str) -> tuple[int, float]:
