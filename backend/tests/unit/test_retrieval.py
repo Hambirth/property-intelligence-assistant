@@ -1,3 +1,4 @@
+from app.rag.embeddings import EmbeddingUnavailableError
 from app.rag.retrieval import VectorRetrievalService
 from app.repositories.chunks import ChunkSearchRow
 from app.scraping.models import SourceName
@@ -43,6 +44,21 @@ class FakeRepository:
         ]
 
 
+class UnavailableEmbeddings(FakeEmbeddings):
+    def embed_query(self, text):
+        raise EmbeddingUnavailableError(text)
+
+
+class LexicalFallbackRepository(FakeRepository):
+    def __init__(self) -> None:
+        super().__init__()
+        self.lexical_query = None
+
+    async def search_lexical(self, query, *, top_k, source):
+        self.lexical_query = query
+        return await self.search(None, top_k=top_k, source=source)
+
+
 async def test_retrieval_preserves_similarity_order_and_source_filter() -> None:
     repository = FakeRepository()
     service = VectorRetrievalService(repository, FakeEmbeddings())
@@ -73,3 +89,18 @@ async def test_retrieval_validates_top_k_and_query() -> None:
         assert "empty" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("empty query was accepted")
+
+
+async def test_retrieval_falls_back_when_remote_embeddings_are_unavailable() -> None:
+    repository = LexicalFallbackRepository()
+    service = VectorRetrievalService(repository, UnavailableEmbeddings())
+
+    results = await service.search(
+        "The Astera interiors by Aston Martin",
+        top_k=2,
+        source=SourceName.DAR_GLOBAL,
+    )
+
+    assert repository.lexical_query == "The Astera interiors by Aston Martin"
+    assert repository.source is SourceName.DAR_GLOBAL
+    assert [result.document_title for result in results] == ["First", "Second"]

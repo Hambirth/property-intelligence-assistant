@@ -21,6 +21,10 @@ class _OpenRouterEmbeddingInputError(RuntimeError):
     pass
 
 
+class EmbeddingUnavailableError(RuntimeError):
+    """Raised when a remote embedding provider cannot serve a valid request."""
+
+
 class EmbeddingProvider(Protocol):
     model_name: str
     dimension: int
@@ -207,8 +211,10 @@ class OpenRouterEmbeddingService:
                     or exc.response.status_code in {408, 429, 500, 502, 503, 504}
                 )
                 if not retryable or attempt >= self.max_retries:
-                    raise RuntimeError("OpenRouter embedding request failed") from exc
-        raise RuntimeError("OpenRouter embedding request failed")
+                    raise EmbeddingUnavailableError(
+                        "OpenRouter embedding request failed"
+                    ) from exc
+        raise EmbeddingUnavailableError("OpenRouter embedding request failed")
 
 
 def _normalize_remote_vectors(

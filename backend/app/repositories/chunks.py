@@ -1,3 +1,4 @@
+import re
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -10,6 +11,46 @@ from app.models.chunk import DocumentChunk
 from app.models.document import Document
 from app.rag.chunking import DocumentChunkDraft
 from app.scraping.models import SourceName
+
+_LEXICAL_FALLBACK_MAX_ROWS = 2_000
+_LEXICAL_TOKEN_RE = re.compile(r"[^\W_]+", flags=re.UNICODE)
+_LEXICAL_STOP_WORDS = frozenset(
+    {
+        "a",
+        "all",
+        "an",
+        "and",
+        "are",
+        "at",
+        "by",
+        "compare",
+        "darglobal",
+        "does",
+        "for",
+        "from",
+        "has",
+        "have",
+        "how",
+        "in",
+        "is",
+        "it",
+        "near",
+        "of",
+        "on",
+        "or",
+        "project",
+        "property",
+        "residence",
+        "that",
+        "the",
+        "this",
+        "to",
+        "wasalt",
+        "what",
+        "which",
+        "with",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,3 +134,73 @@ class DocumentChunkRepository:
             )
             for chunk, document, similarity in rows
         ]
+
+    async def search_lexical(
+        self,
+        query: str,
+        *,
+        top_k: int,
+        source: SourceName | None = None,
+    ) -> list[ChunkSearchRow]:
+        """Rank the small verified corpus without an external embedding request."""
+        query_terms = _lexical_terms(query)
+        if not query_terms:
+            return []
+        statement = (
+            select(DocumentChunk, Document)
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .order_by(DocumentChunk.id)
+            .limit(_LEXICAL_FALLBACK_MAX_ROWS)
+        )
+        if source is not None:
+            statement = statement.where(Document.source == source.value)
+        rows = (await self._session.execute(statement)).all()
+        ranked: list[tuple[float, int, DocumentChunk, Document]] = []
+        for chunk, document in rows:
+            matched, similarity = _lexical_score(
+                query_terms, f"{document.title} {chunk.content}"
+            )
+            if matched:
+                ranked.append((similarity, matched, chunk, document))
+        ranked.sort(
+            key=lambda item: (
+                -item[0],
+                -item[1],
+                item[3].canonical_url,
+                item[2].chunk_index,
+            )
+        )
+        return [
+            ChunkSearchRow(
+                chunk_content=chunk.content,
+                similarity=similarity,
+                document_title=document.title,
+                source=SourceName(document.source),
+                canonical_url=document.canonical_url,
+                metadata={**chunk.metadata_, "retrieval_mode": "lexical_fallback"},
+            )
+            for similarity, _matched, chunk, document in ranked[:top_k]
+        ]
+
+
+def _lexical_terms(text: str) -> frozenset[str]:
+    return frozenset(
+        normalized
+        for token in _LEXICAL_TOKEN_RE.findall(text.casefold())
+        if (normalized := _normalize_lexical_token(token))
+        and normalized not in _LEXICAL_STOP_WORDS
+    )
+
+
+def _normalize_lexical_token(token: str) -> str:
+    if len(token) < 2:
+        return ""
+    if token.isascii() and len(token) > 4 and token.endswith("s"):
+        return token[:-1]
+    return token
+
+
+def _lexical_score(query_terms: frozenset[str], text: str) -> tuple[int, float]:
+    matched = len(query_terms & _lexical_terms(text))
+    denominator = max(1, min(4, len(query_terms)))
+    return matched, min(0.99, matched / denominator)

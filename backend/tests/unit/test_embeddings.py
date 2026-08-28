@@ -8,6 +8,7 @@ from app.rag import embeddings as embedding_module
 from app.rag.embeddings import (
     BGE_QUERY_PREFIX,
     EMBEDDING_DIMENSION,
+    EmbeddingUnavailableError,
     LocalEmbeddingService,
     OpenRouterEmbeddingService,
 )
@@ -143,6 +144,26 @@ def test_openrouter_embedding_service_splits_rejected_batches(
 
     assert len(vectors) == 2
     assert batch_sizes == [2, 1, 1]
+
+
+def test_openrouter_rate_limit_raises_provider_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_client = embedding_module.httpx.Client
+    transport = embedding_module.httpx.MockTransport(
+        lambda _request: embedding_module.httpx.Response(429, json={"error": "limited"})
+    )
+    monkeypatch.setattr(
+        embedding_module.httpx,
+        "Client",
+        lambda **kwargs: real_client(transport=transport, **kwargs),
+    )
+    service = OpenRouterEmbeddingService(
+        api_key=SecretStr("test-key"), max_retries=0
+    )
+
+    with pytest.raises(EmbeddingUnavailableError):
+        service.embed_query("find a residence")
 
 
 def test_embedding_service_cache_prevents_duplicate_model_instances(

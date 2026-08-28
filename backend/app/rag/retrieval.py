@@ -1,11 +1,14 @@
 import asyncio
+import logging
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.rag.embeddings import EmbeddingProvider
+from app.rag.embeddings import EmbeddingProvider, EmbeddingUnavailableError
 from app.repositories.chunks import DocumentChunkRepository
 from app.scraping.models import SourceName
+
+logger = logging.getLogger(__name__)
 
 
 class RetrievalResult(BaseModel):
@@ -38,10 +41,20 @@ class VectorRetrievalService:
             raise ValueError("Retrieval query cannot be empty")
         if not 1 <= top_k <= 20:
             raise ValueError("top_k must be between 1 and 20")
-        query_embedding = await asyncio.to_thread(
-            self._embeddings.embed_query, clean_query
-        )
-        rows = await self._repository.search(query_embedding, top_k=top_k, source=source)
+        try:
+            query_embedding = await asyncio.to_thread(
+                self._embeddings.embed_query, clean_query
+            )
+        except EmbeddingUnavailableError:
+            logger.warning(
+                "Embedding provider unavailable; using lexical corpus fallback",
+                extra={"source_filter": source.value if source is not None else None},
+            )
+            rows = await self._repository.search_lexical(
+                clean_query, top_k=top_k, source=source
+            )
+        else:
+            rows = await self._repository.search(query_embedding, top_k=top_k, source=source)
         return [
             RetrievalResult(
                 chunk_content=row.chunk_content,
