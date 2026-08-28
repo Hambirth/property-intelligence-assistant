@@ -407,6 +407,7 @@ def _provider_evidence_fallback(
     question_terms = _meaningful_terms(question)
     selected: list[tuple[ContextSource, str]] = []
     seen_urls: set[str] = set()
+    source_limit = _fallback_source_limit(question)
     for source in sources:
         if source.canonical_url in seen_urls:
             continue
@@ -419,7 +420,7 @@ def _provider_evidence_fallback(
             continue
         selected.append((source, detail))
         seen_urls.add(source.canonical_url)
-        if len(selected) >= 3:
+        if len(selected) >= source_limit:
             break
     if not selected:
         return None
@@ -431,6 +432,23 @@ def _provider_evidence_fallback(
     ]
     lines.extend(f"- **{source.title}:** {detail}" for source, detail in selected)
     return "\n".join(lines), [source for source, _ in selected]
+
+
+def _fallback_source_limit(question: str) -> int:
+    lowered = " ".join(question.casefold().split())
+    multi_source_markers = (
+        "compare",
+        "difference between",
+        " versus ",
+        " vs ",
+        "which properties",
+        "which residences",
+        "what properties",
+        "what residences",
+        "list ",
+        "options",
+    )
+    return 3 if any(marker in lowered for marker in multi_source_markers) else 1
 
 
 def _best_evidence_excerpt(text: str, question_terms: set[str]) -> str:

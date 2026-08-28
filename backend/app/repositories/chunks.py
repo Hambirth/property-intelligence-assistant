@@ -158,19 +158,19 @@ class DocumentChunkRepository:
         if source is not None:
             statement = statement.where(Document.source == source.value)
         rows = (await self._session.execute(statement)).all()
-        ranked: list[tuple[float, int, DocumentChunk, Document]] = []
+        ranked: list[tuple[float, int, int, DocumentChunk, Document]] = []
         for chunk, document in rows:
-            matched, similarity = _lexical_score(
-                query_terms, f"{document.title} {chunk.content}"
-            )
+            matched, similarity = _lexical_score(query_terms, f"{document.title} {chunk.content}")
             if matched:
-                ranked.append((similarity, matched, chunk, document))
+                title_matched = len(query_terms & _lexical_terms(document.title))
+                ranked.append((similarity, title_matched, matched, chunk, document))
         ranked.sort(
             key=lambda item: (
                 -item[0],
                 -item[1],
-                item[3].canonical_url,
-                item[2].chunk_index,
+                -item[2],
+                item[4].canonical_url,
+                item[3].chunk_index,
             )
         )
         return [
@@ -182,7 +182,7 @@ class DocumentChunkRepository:
                 canonical_url=document.canonical_url,
                 metadata={**chunk.metadata_, "retrieval_mode": "lexical_fallback"},
             )
-            for similarity, _matched, chunk, document in ranked[:top_k]
+            for similarity, _title_matched, _matched, chunk, document in ranked[:top_k]
         ]
 
 
@@ -190,8 +190,7 @@ def _lexical_terms(text: str) -> frozenset[str]:
     return frozenset(
         normalized
         for token in _LEXICAL_TOKEN_RE.findall(text.casefold())
-        if (normalized := _normalize_lexical_token(token))
-        and normalized not in _LEXICAL_STOP_WORDS
+        if (normalized := _normalize_lexical_token(token)) and normalized not in _LEXICAL_STOP_WORDS
     )
 
 

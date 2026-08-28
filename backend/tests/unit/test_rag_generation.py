@@ -180,6 +180,37 @@ async def test_provider_rate_limit_returns_bounded_grounded_evidence() -> None:
     assert response.citations[0].url == "https://wasalt.sa/en/property/apartment-1"
 
 
+async def test_single_property_provider_fallback_uses_only_top_source() -> None:
+    generator = FakeGenerator(error=LLMErrorCategory.RATE_LIMITED)
+    results = [
+        _result().model_copy(
+            update={
+                "document_title": "W Residences Dubai Downtown",
+                "canonical_url": "https://cdn.darglobal.co.uk/w-residences.pdf",
+                "source": SourceName.DAR_GLOBAL,
+                "chunk_content": "W Residences Dubai Downtown is near Burj Khalifa.",
+            }
+        ),
+        _result(0.9).model_copy(
+            update={
+                "document_title": "Another Dubai Residence",
+                "canonical_url": "https://cdn.darglobal.co.uk/another.pdf",
+                "source": SourceName.DAR_GLOBAL,
+                "chunk_content": "Another residence is located in Dubai.",
+            }
+        ),
+    ]
+
+    response = await _service(results, generator).answer(
+        "What information is available about W Residences Dubai?"
+    )
+
+    assert response.status is RAGStatus.ANSWERED
+    assert len(response.citations) == 1
+    assert response.citations[0].title == "W Residences Dubai Downtown"
+    assert "Another Dubai Residence" not in response.answer
+
+
 async def test_invalid_provider_response_does_not_use_evidence_fallback() -> None:
     generator = FakeGenerator(error=LLMErrorCategory.INVALID_RESPONSE)
     response = await _service([_result()], generator).answer("What is the price?")
