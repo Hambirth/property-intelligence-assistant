@@ -39,7 +39,15 @@ async def run(dataset: Path, *, live: bool, live_limit: int) -> dict[str, object
         ]
         by_id = {case.case_id: case for case in cases}
         cases = [by_id[case_id] for case_id in preferred[:live_limit]]
-    embeddings = get_embedding_service(settings.embedding_model, settings.embedding_batch_size)
+    embeddings = get_embedding_service(
+        settings.embedding_model,
+        settings.embedding_batch_size,
+        provider=settings.embedding_provider,
+        api_key=settings.openrouter_api_key,
+        base_url=settings.openrouter_base_url,
+        timeout_seconds=settings.openrouter_timeout_seconds,
+        max_retries=settings.openrouter_max_retries,
+    )
     async with AsyncSessionFactory() as session:
         retrieval = VectorRetrievalService(DocumentChunkRepository(session), embeddings)
 

@@ -44,7 +44,13 @@ def _build_rag_service(
     session: AsyncSession, settings: Settings
 ) -> GroundedRAGService:
     embeddings = get_embedding_service(
-        settings.embedding_model, settings.embedding_batch_size
+        settings.embedding_model,
+        settings.embedding_batch_size,
+        provider=settings.embedding_provider,
+        api_key=settings.openrouter_api_key,
+        base_url=settings.openrouter_base_url,
+        timeout_seconds=settings.openrouter_timeout_seconds,
+        max_retries=settings.openrouter_max_retries,
     )
     return GroundedRAGService(
         retrieval=VectorRetrievalService(DocumentChunkRepository(session), embeddings),

@@ -22,7 +22,7 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.document import Document
 
-EMBEDDING_DIMENSION = 384
+EMBEDDING_DIMENSION = 1024
 
 
 class DocumentChunk(Base):

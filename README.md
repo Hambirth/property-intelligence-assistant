@@ -188,8 +188,9 @@ cd backend
 .venv/bin/alembic upgrade head
 ```
 
-The second migration creates `documents`. The third creates `document_chunks` with a cascading
-document foreign key and a fixed `vector(384)` column selected through the Phase 4 benchmark. Exact
+The second migration creates `documents`. The third creates `document_chunks`; migration
+`20260827_0004` replaces derived vectors with the zero-cost deployment model and fixes the column at
+`vector(1024)`. Exact
 sequential cosine search is intentional for the current 212 chunks; no approximate index is used.
 
 ## Data sources
@@ -243,16 +244,19 @@ See [CORPUS_REPORT.md](./CORPUS_REPORT.md) for the Phase 3.5 investigation and c
 
 ## Vectorization and retrieval evaluation
 
-After migration `20260825_0003` is applied and the normalized corpus is present in PostgreSQL,
+After migration `20260827_0004` is applied and the normalized corpus is present in PostgreSQL,
 build or refresh derived chunks from the repository root:
 
 ```bash
 backend/.venv/bin/python -m scripts.embed_documents
 ```
 
-The command loads `BAAI/bge-small-en-v1.5` once, chunks documents deterministically, embeds only
-new or changed documents, and transactionally replaces stale chunks. A repeat run with unchanged
-documents reports 20 unchanged documents and 212 skipped chunks.
+With `EMBEDDING_PROVIDER=openrouter`, the command uses
+`liquid/lfm-2.5-embedding-350m:free`, bounds embedding inputs to 400 characters, chunks documents
+deterministically, embeds only new or changed documents, and transactionally replaces stale chunks.
+A repeat run with unchanged documents reports 20 unchanged documents and 212 skipped chunks without
+calling the provider. Local BGE remains available through the `local-embeddings` optional dependency
+for historical benchmarking, but it is not compatible with the free production vector space.
 
 Run the checked-in model comparison and database-backed retrieval evaluation with:
 

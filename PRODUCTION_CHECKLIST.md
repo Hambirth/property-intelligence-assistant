@@ -44,7 +44,7 @@ defaults unless measured product requirements justify a bounded change.
 - [ ] Use a runtime role that is not a superuser and cannot create extensions or arbitrary schemas.
 - [ ] If practical, use a separate short-lived migration role for DDL.
 - [ ] Run `alembic upgrade head` once as a controlled release job, not concurrently in every replica.
-- [ ] Verify the migration revision, `vector(384)` dimension, constraints, indexes, and cascade behavior.
+- [ ] Verify the migration revision, `vector(1024)` dimension, constraints, indexes, and cascade behavior.
 - [ ] Confirm connection pool size/overflow fits database connection limits across all replicas.
 
 ## 4. Corpus ingestion and vectors
@@ -60,7 +60,7 @@ defaults unless measured product requirements justify a bounded change.
 - [ ] Run vectorization and verify every document has current chunks/pipeline fingerprints.
 - [ ] Re-run import/vectorization to verify idempotency before release.
 - [ ] Record DarGlobal, Wasalt, total document, and total chunk counts.
-- [ ] Require `python -m app.deployment.verify` to report 10/10/20 documents, 212 chunks, vector(384),
+- [ ] Require `python -m app.deployment.verify` to report 10/10/20 documents, 212 chunks, vector(1024),
   one pipeline fingerprint, migration head, pgvector, and all-manual provenance.
 - [ ] Delete extracted source files and bootstrap credentials before starting public web processes.
 
@@ -71,9 +71,9 @@ defaults unless measured product requirements justify a bounded change.
 - [ ] Start the backend as a non-root user with proxy-header rewriting disabled.
 - [ ] Start the frontend as a non-root user.
 - [ ] Apply CPU, memory, process, and request concurrency limits.
-- [ ] Allocate 2 GiB RAM and one Uvicorn worker; do not deploy this model on a 512 MiB instance.
-- [ ] Decide explicitly between a persistent `/app/.cache/huggingface` disk and accepted model
-  redownload/cold-start time; never bake a developer cache into the image.
+- [ ] Use one Uvicorn worker on Render Free only with `EMBEDDING_PROVIDER=openrouter`; the local BGE
+  provider still requires at least 1 GiB and preferably 2 GiB.
+- [ ] Do not attach or copy a model cache into the remote-embedding production image.
 - [ ] Run Alembic once in a controlled release job, then start the backend from its Dockerfile `CMD`.
 - [ ] Terminate TLS at the reviewed ingress and force HTTPS/HSTS there after domain validation.
 - [ ] Ensure PostgreSQL and management surfaces are not publicly exposed.

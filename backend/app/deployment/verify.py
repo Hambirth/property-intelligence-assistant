@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from sqlalchemy import text
 
 from app.db.session import engine
+from app.models.chunk import EMBEDDING_DIMENSION
 
 
 async def verify_database(
@@ -50,14 +51,14 @@ async def verify_database(
 
     expected_documents = expected_darglobal + expected_wasalt
     checks = {
-        "alembic_head": revision == "20260825_0003",
+        "alembic_head": revision == "20260827_0004",
         "darglobal_documents": source_counts.get("darglobal", 0) == expected_darglobal,
         "document_total": documents == expected_documents,
         "document_chunks": chunks == expected_chunks,
         "manual_public_provenance": manual_documents == expected_documents,
         "pgvector_extension": vector_extension is not None,
         "single_pipeline_fingerprint": fingerprint_count == 1,
-        "vector_dimension": dimensions == [384],
+        "vector_dimension": dimensions == [EMBEDDING_DIMENSION],
         "wasalt_documents": source_counts.get("wasalt", 0) == expected_wasalt,
     }
     return {

@@ -56,18 +56,15 @@ image.
 
 The current assignment-sized recommendation is:
 
-- **Frontend: Vercel Pro for a public production deployment; Hobby only for a non-commercial demo.**
-  The [current pricing page](https://vercel.com/pricing) lists Hobby at $0 and Pro at $20/month plus
-  usage (with an included usage credit). It has native Next.js builds, managed HTTPS, and build-time
-  `NEXT_PUBLIC_*` configuration. Verify the final API origin before building because public
-  variables are compiled into browser assets.
-- **Backend: Render Standard-class web service with 2 GiB RAM, one instance, and health path
-  `/health`.** [Render's current compute table](https://render.com/docs/compute-plans) gives Free and
-  Starter 512 MiB but Standard 2 GiB. A small persistent disk mounted at
-  `/app/.cache/huggingface` is useful for this single-instance assignment, but
-  [paid disks](https://render.com/docs/disks) prevent multi-instance scaling and zero-downtime
-  deploys; a stateless service with accepted model redownload time is the alternative. Confirm the
-  current regional Standard and disk prices in the Render dashboard.
+- **Frontend: Vercel Hobby for this non-commercial hiring demo.** It provides managed HTTPS and
+  native Next.js builds at $0. Public `NEXT_PUBLIC_*` values are compiled into browser assets, so
+  build only after the final API origin is known.
+- **Backend: Render Free, one instance, and health path `/health`.** The deployed image uses remote
+  OpenRouter embeddings and excludes PyTorch, sentence-transformers, and model-cache state, making
+  the 512 MiB free instance practical. Free instances spin down, cold-start, have ephemeral storage,
+  and are not a high-availability production tier. OpenRouter free models add daily quota and
+  availability constraints. The previously measured local BGE runtime still requires at least 1 GiB
+  and preferably 2 GiB; it must never be enabled on this free service.
 - **Database: Neon PostgreSQL with pgvector.** The corpus is tiny (20 documents and 212 vectors), so
   the free tier can support deployment validation. [Neon's current pricing](https://neon.com/pricing)
   lists Free at 100 CU-hours/project/month and 0.5 GB, and usage-based Launch at $0.106/CU-hour plus
@@ -76,8 +73,8 @@ The current assignment-sized recommendation is:
   endpoint for the runtime when compatible with the driver.
 
 Render [free services](https://render.com/docs/free) spin down and have an ephemeral filesystem;
-they are unsuitable for this
-backend's memory and cold-start profile. Neon free compute can scale to zero, so the first readiness
+the remote-embedding deployment accepts those demo-tier constraints. Neon free compute can scale to
+zero, so the first readiness
 or query after inactivity can include a database wake-up. Prices and free-tier terms change: confirm
 them in the provider consoles before spending or launching.
 
@@ -94,6 +91,7 @@ DATABASE_URL
 FRONTEND_URL
 OPENROUTER_API_KEY
 OPENROUTER_MODEL
+EMBEDDING_PROVIDER
 EMBEDDING_MODEL
 EMBEDDING_PRELOAD
 ALLOW_LOCALHOST_ORIGINS
@@ -141,8 +139,9 @@ CORPUS_BUNDLE_SHA256
 CORPUS_VERSION
 ```
 
-Set `APP_ENV=production`, `ALLOW_LOCALHOST_ORIGINS=false`, exact HTTPS `FRONTEND_URL` origins, and
-the fixed `EMBEDDING_MODEL=BAAI/bge-small-en-v1.5`. `DATABASE_URL` must use the
+Set `APP_ENV=production`, `ALLOW_LOCALHOST_ORIGINS=false`, exact HTTPS `FRONTEND_URL` origins,
+`EMBEDDING_PROVIDER=openrouter`, and
+`EMBEDDING_MODEL=liquid/lfm-2.5-embedding-350m:free`. `DATABASE_URL` must use the
 `postgresql+asyncpg://` SQLAlchemy scheme and provider-required TLS settings. Keep
 `OPENROUTER_API_KEY` only in the backend. Scraper variables are intentionally absent from the public
 runtime contract because deployment startup does not scrape.

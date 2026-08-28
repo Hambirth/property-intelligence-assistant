@@ -5,9 +5,9 @@
 ```mermaid
 flowchart LR
     B[Browser] --> N[Next.js container or Vercel]
-    N --> F[One FastAPI worker / 2 GiB]
+    N --> F[One FastAPI worker / Render Free]
     F --> P[(Managed PostgreSQL + pgvector)]
-    F --> O[OpenRouter]
+    F --> O[OpenRouter generation + embeddings]
     A[Private immutable corpus artifact] --> J[Trusted one-off bootstrap job]
     J --> P
 ```
@@ -15,18 +15,19 @@ flowchart LR
 The application remains a modular monolith. The web image contains no raw/manual corpus, processed
 JSONL, secrets, or model cache. A deterministic private artifact plus a trusted one-off job bridges
 that deliberate source-control boundary: the job verifies hashes, runs both offline imports, builds
-vectors, verifies 10 DarGlobal documents, 10 Wasalt documents, 212 chunks, 384 dimensions, migration
+vectors, verifies 10 DarGlobal documents, 10 Wasalt documents, 212 chunks, 1,024 dimensions, migration
 head, and `MANUAL_PUBLIC_IMPORT` provenance, then deletes its temporary files. Public startup never
 scrapes or imports.
 
 Both application Dockerfiles are multi-stage and use digest-pinned bases. Runtime users are fixed
-non-root UID/GID 10001. The backend uses the official CPU-only PyTorch wheel and one Uvicorn worker;
-additional workers would duplicate the embedding model in memory. Phase 9 measured about 451 MiB for
-the warmed container and more during corpus work, so 512 MiB is rejected, 1 GiB is a hard controlled
-floor, and 2 GiB is the production recommendation. The model cache is runtime state, not an image
-layer; persistence trades faster subsequent cold starts for single-instance/downtime constraints on
-some platforms. The selected BGE model is pinned to an immutable Hugging Face commit, and that
-revision participates in the vector pipeline fingerprint.
+non-root UID/GID 10001. The initial local-BGE design measured about 451 MiB warmed and correctly
+required a 2 GiB backend. For the explicitly zero-cost hiring demo, production now calls the reviewed
+OpenRouter free embedding model and does not install PyTorch, sentence-transformers, or a model
+cache in the image. The bounded 400-character embedding input policy and provider model name
+participate in the pipeline fingerprint. This makes a single Render Free worker viable, with the
+documented tradeoffs of cold starts, 512 MiB RAM, and OpenRouter's free-model availability and
+50-request daily account quota. The local BGE implementation remains an optional development and
+benchmark dependency, not the deployed query path.
 
 Compose is a loopback validation topology. Its single backend performs Alembic migration before
 Uvicorn for convenience. Production uses a once-per-release migration job followed by the image

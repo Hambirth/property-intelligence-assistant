@@ -1,8 +1,16 @@
+import json
+
 import numpy as np
 import pytest
+from pydantic import SecretStr
 
 from app.rag import embeddings as embedding_module
-from app.rag.embeddings import BGE_QUERY_PREFIX, LocalEmbeddingService
+from app.rag.embeddings import (
+    BGE_QUERY_PREFIX,
+    EMBEDDING_DIMENSION,
+    LocalEmbeddingService,
+    OpenRouterEmbeddingService,
+)
 
 
 class FakeSentenceTransformer:
@@ -60,8 +68,81 @@ def test_dimension_mismatch_fails_clearly(monkeypatch: pytest.MonkeyPatch) -> No
         embedding_module, "_load_model", lambda _name, _revision: FakeSentenceTransformer(768)
     )
 
-    with pytest.raises(RuntimeError, match="database dimension"):
+    with pytest.raises(RuntimeError, match="local model dimension"):
         LocalEmbeddingService()
+
+
+def test_openrouter_embedding_service_normalizes_and_uses_query_input_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requests = []
+    real_client = embedding_module.httpx.Client
+
+    def handler(request):
+        requests.append(request)
+        return embedding_module.httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "index": 0,
+                        "embedding": [2.0] + [0.0] * (EMBEDDING_DIMENSION - 1),
+                    }
+                ]
+            },
+        )
+
+    transport = embedding_module.httpx.MockTransport(handler)
+    monkeypatch.setattr(
+        embedding_module.httpx,
+        "Client",
+        lambda **kwargs: real_client(transport=transport, **kwargs),
+    )
+    service = OpenRouterEmbeddingService(api_key=SecretStr("test-key"))
+
+    vector = service.embed_query("find a residence")
+
+    assert len(vector) == EMBEDDING_DIMENSION
+    assert vector[0] == 1.0
+    assert requests[0].headers["Authorization"] == "Bearer test-key"
+    assert b'"input_type":"search_query"' in requests[0].content
+
+
+def test_openrouter_embedding_service_splits_rejected_batches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_client = embedding_module.httpx.Client
+    batch_sizes = []
+
+    def handler(request):
+        payload = json.loads(request.content)
+        batch_sizes.append(len(payload["input"]))
+        if len(payload["input"]) > 1:
+            return embedding_module.httpx.Response(400, json={"error": {"message": "too large"}})
+        return embedding_module.httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "index": 0,
+                        "embedding": [1.0] + [0.0] * (EMBEDDING_DIMENSION - 1),
+                    }
+                ]
+            },
+        )
+
+    transport = embedding_module.httpx.MockTransport(handler)
+    monkeypatch.setattr(
+        embedding_module.httpx,
+        "Client",
+        lambda **kwargs: real_client(transport=transport, **kwargs),
+    )
+    service = OpenRouterEmbeddingService(api_key=SecretStr("test-key"), batch_size=8)
+
+    vectors = service.embed_documents(["one", "two"])
+
+    assert len(vectors) == 2
+    assert batch_sizes == [2, 1, 1]
 
 
 def test_embedding_service_cache_prevents_duplicate_model_instances(

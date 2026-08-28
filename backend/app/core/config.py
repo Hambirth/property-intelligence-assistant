@@ -26,7 +26,11 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
     openrouter_max_retries: int = Field(default=2, ge=0, le=5)
-    embedding_model: Literal["BAAI/bge-small-en-v1.5"] = "BAAI/bge-small-en-v1.5"
+    embedding_provider: Literal["local", "openrouter"] = "local"
+    embedding_model: Literal[
+        "BAAI/bge-small-en-v1.5",
+        "liquid/lfm-2.5-embedding-350m:free",
+    ] = "BAAI/bge-small-en-v1.5"
     embedding_batch_size: int = Field(default=32, ge=1, le=128)
     rag_chunk_target_chars: int = Field(default=900, ge=300, le=4000)
     rag_chunk_overlap_chars: int = Field(default=120, ge=0, le=1000)
@@ -117,6 +121,13 @@ class Settings(BaseSettings):
             raise ValueError("RAG minimum chunk size cannot exceed the target size")
         if self.max_chat_body_bytes <= self.max_chat_message_length:
             raise ValueError("MAX_CHAT_BODY_BYTES must exceed MAX_CHAT_MESSAGE_LENGTH")
+        if self.embedding_provider == "openrouter":
+            if self.embedding_model != "liquid/lfm-2.5-embedding-350m:free":
+                raise ValueError("OpenRouter embeddings require the reviewed free embedding model")
+            if self.openrouter_api_key is None:
+                raise ValueError("OPENROUTER_API_KEY is required for OpenRouter embeddings")
+        elif self.embedding_model != "BAAI/bge-small-en-v1.5":
+            raise ValueError("Local embeddings require BAAI/bge-small-en-v1.5")
         if self.app_env == "production":
             if urlsplit(self.openrouter_base_url).scheme != "https":
                 raise ValueError("OPENROUTER_BASE_URL must use HTTPS in production")
