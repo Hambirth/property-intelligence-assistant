@@ -37,3 +37,16 @@ def test_lexical_fallback_recognizes_w_residences_question() -> None:
     assert terms == frozenset({"w", "dubai"})
     assert matched == 2
     assert score == 0.99
+
+
+def test_lexical_fallback_ignores_conversational_astera_prefix() -> None:
+    terms = _lexical_terms("Tell me about The Astera.")
+
+    matched, score = _lexical_score(
+        terms,
+        "The Astera, Interiors by Aston Martin - Official DarGlobal Brochure",
+    )
+
+    assert terms == frozenset({"astera"})
+    assert matched == 1
+    assert score == 0.99
